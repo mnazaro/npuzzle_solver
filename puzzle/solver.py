@@ -1,8 +1,22 @@
 import heapq
+from puzzle.board import Puzzle 
+
+def find_position(board, value):
+    for i, row in enumerate(board):
+        if value in row:
+            return i, row.index(value)
+    return None
 
 def heuristic(board, goal):
-    # Implementar a função heurística (ex: distância de Manhattan)
-    pass
+    size = len(board)
+    distance = 0
+    for i in range(size):
+        for j in range(size):
+            tile = board[i][j]
+            if tile != 0:
+                goal_x, goal_y = find_position(goal, tile)
+                distance += abs(goal_x - i) + abs(goal_y - j)
+    return distance
 
 def a_star(puzzle, goal):
     open_set = []
@@ -18,7 +32,7 @@ def a_star(puzzle, goal):
             return reconstruct_path(came_from, current)
 
         for direction in ['up', 'down', 'left', 'right']:
-            neighbor = puzzle([row[:] for row in current.board])
+            neighbor = Puzzle([row[:] for row in current.board])
             neighbor.move(direction)
             tentative_g_score = g_score[str(current.board)] + 1
 

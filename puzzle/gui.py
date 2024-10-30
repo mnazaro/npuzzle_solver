@@ -1,59 +1,101 @@
-import tkinter as tk
-from puzzle.board import Puzzle
-from puzzle.solver import a_star
+import sys
 import random
+from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton
+from PySide6.QtWidgets import QVBoxLayout, QWidget, QLabel, QGridLayout
+from PySide6.QtWidgets import QSpinBox, QDialog, QDialogButtonBox
+from PySide6.QtCore import Qt, QTimer, QRect, QPropertyAnimation
+from puzzle.solver import a_star
+from puzzle.board import Puzzle
 
-class PuzzleGUI:
-    def __init__(self, root, puzzle):
-        self.root = root
+class PuzzleGUI(QMainWindow):
+    def __init__(self, puzzle):
+        super().__init__()
         self.puzzle = puzzle
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle("8 Puzzle Game")
+        self.setGeometry(100, 100, 400, 400)
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+
+        self.layout = QVBoxLayout()
+        central_widget.setLayout(self.layout)
+
+        self.title = QLabel("8 Puzzle Game")
+        self.title.setAlignment(Qt.AlignCenter)
+        self.title.setStyleSheet("font-size: 24px;")
+        self.layout.addWidget(self.title)
+
+        self.instructions = QLabel("Clique nos botões para mover as peças.")
+        self.instructions.setAlignment(Qt.AlignCenter)
+        self.instructions.setStyleSheet("font-size: 14px;")
+        self.layout.addWidget(self.instructions)
+
+        self.grid_layout = QGridLayout()
+        self.layout.addLayout(self.grid_layout)
+
         self.buttons = []
-        self.create_widgets()
-        self.update_board()
-
-    def create_widgets(self):
-        self.root.title("8 Puzzle Game")
-
-        # Título
-        title = tk.Label(self.root, text="8 Puzzle Game", font=("Helvetica", 16))
-        title.grid(row=0, columnspan=self.puzzle.size)
-
-        # Instruções
-        instructions = tk.Label(self.root, text="Clique nos botões para mover as peças.", font=("Helvetica", 10))
-        instructions.grid(row=1, column=0, columnspan=self.puzzle.size)
-
-        # Botões do tabuleiro
         for i in range(self.puzzle.size):
             row = []
             for j in range(self.puzzle.size):
-                button = tk.Button(self.root, text='', width=4, height=2, font=("Helvetica", 14),
-                                   bg='lightblue', fg='black', relief='raised', bd=3,
-                                   command=lambda i=i, j=j: self.move_tile(i, j))
-                button.grid(row=i+2, column=j, padx=5, pady=5)
+                button = QPushButton('')
+                button.setFixedSize(80, 80)
+                button.setStyleSheet("font-size: 18px; background-color: #f8f8f8; color: #333;")
+                button.clicked.connect(lambda _, i=i, j=j: self.move_tile(i, j))
+                self.grid_layout.addWidget(button, i, j)
                 row.append(button)
             self.buttons.append(row)
 
-        # Botão de reset
-        reset_button = tk.Button(self.root, text="Reset", command=self.reset_board, font=("Helvetica", 12),
-                                 bg='lightgreen', fg='black', relief='raised', bd=3)
-        reset_button.grid(row=self.puzzle.size+2, column=0, columnspan=self.puzzle.size//2)
+        self.reset_button = QPushButton("Reset")
+        self.reset_button.clicked.connect(self.reset_board)
+        self.layout.addWidget(self.reset_button)
 
-        # Botão de resolver automaticamente
-        solve_button = tk.Button(self.root, text="Solve", command=self.solve_puzzle, font=("Helvetica", 12),
-                                 bg='lightcoral', fg='black', relief='raised', bd=3)
-        solve_button.grid(row=self.puzzle.size+2, column=self.puzzle.size//2, columnspan=self.puzzle.size//2)
+        self.solve_button = QPushButton("Solve")
+        self.solve_button.clicked.connect(self.solve_puzzle)
+        self.layout.addWidget(self.solve_button)
+
+        self.update_board()
 
     def update_board(self):
         for i in range(self.puzzle.size):
             for j in range(self.puzzle.size):
                 tile = self.puzzle.board[i][j]
-                self.buttons[i][j].config(text=str(tile) if tile != 0 else '')
+                self.buttons[i][j].setText(str(tile) if tile != 0 else '')
+                self.buttons[i][j].setStyleSheet(
+                    "font-size: 18px; background-color: #f8f8f8; color: #333;" if tile != 0 else "font-size: 18px; background-color: lightgrey;")
 
     def move_tile(self, i, j):
         x, y = self.puzzle.empty_tile
         if (i == x and abs(j - y) == 1) or (j == y and abs(i - x) == 1):
-            self.puzzle.move('up' if i < x else 'down' if i > x else 'left' if j < y else 'right')
+            direction = 'up' if i < x else 'down' if i > x else 'left' if j < y else 'right'
+            self.animate_slide(i, j, direction)
+            self.puzzle.move(direction)
             self.update_board()
+
+    def animate_slide(self, i, j, direction):
+        x, y = self.puzzle.empty_tile
+        steps = abs(i - x) + abs(j - y)
+        for step in range(steps):
+            QTimer.singleShot(100*step, lambda: self.slide_tile(i, j, direction))
+
+    def slide_tile(self, i, j, direction):
+        button = self.buttons[i][j]
+        animation = QPropertyAnimation(button, b"geometry")
+        animation.setDuration(100)
+        start_rect = button.geometry()
+        if direction == 'up':
+            end_rect = QRect(start_rect.x(), start_rect.y() - button.height(), start_rect.width(), start_rect.height())
+        elif direction == 'down':
+            end_rect = QRect(start_rect.x(), start_rect.y() + button.height(), start_rect.width(), start_rect.height())
+        elif direction == 'left':
+            end_rect = QRect(start_rect.x() - button.width(), start_rect.y(), start_rect.width(), start_rect.height())
+        elif direction == 'right':
+            end_rect = QRect(start_rect.x() + button.width(), start_rect.y(), start_rect.width(), start_rect.height())
+        animation.setStartValue(start_rect)
+        animation.setEndValue(end_rect)
+        animation.start()
 
     def reset_board(self):
         self.puzzle = Puzzle(generate_random_board(self.puzzle.size))
@@ -66,43 +108,94 @@ class PuzzleGUI:
             for step in solution:
                 self.puzzle = step
                 self.update_board()
-                self.root.update()
-                self.root.after(500)  # Delay para visualizar os passos
+                QTimer.singleShot(500, lambda: None)  # Delay para visualizar os passos
+
+    def random_moves(self, num_moves):
+        directions = ['up', 'down', 'left', 'right']
+        last_moves = []
+        for _ in range(num_moves):
+            possible_moves = [d for d in directions if self.puzzle.can_move(d)]
+            if not possible_moves:
+                continue
+            move = random.choice(possible_moves)
+            while last_moves and move == last_moves[-1]:
+                move = random.choice(possible_moves)
+            self.puzzle.move(move)
+            last_moves.append(move)
+            if len(last_moves) > 2:
+                last_moves.pop(0)
+            self.update_board()
 
 def generate_random_board(size):
-    board = list(range(size*size))
-    random.shuffle(board)
+    board = list(range(1, size*size)) + [0]
     return [board[i*size:(i+1)*size] for i in range(size)]
 
 def generate_goal_board(size):
     return [list(range(i*size+1, (i+1)*size+1)) for i in range(size)]
 
-def choose_size():
-    size_window = tk.Tk()
-    size_window.title("Escolha o tamanho do tabuleiro")
+class SizeDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Escolha o Tamanho do Tabuleiro")
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
 
-    tk.Label(size_window, text="Escolha o tamanho do tabuleiro (3-10):", font=("Helvetica", 12)).pack(pady=10)
-    size_var = tk.IntVar(value=3)
-    size_entry = tk.Entry(size_window, textvariable=size_var, font=("Helvetica", 12))
-    size_entry.pack(pady=10)
+        self.label = QLabel("Escolha o tamanho do tabuleiro (3-10):")
+        self.layout.addWidget(self.label)
 
-    def start_game():
-        size = size_var.get()
-        if 3 <= size <= 10:
-            size_window.destroy()
-            initial_board = generate_random_board(size)
-            puzzle = Puzzle(initial_board)
-            root = tk.Tk()
-            gui = PuzzleGUI(root, puzzle)
-            root.mainloop()
-        else:
-            tk.Label(size_window, text="Tamanho inválido. Tente novamente.", font=("Helvetica", 12)).pack(pady=10)
+        self.spin_box = QSpinBox()
+        self.spin_box.setRange(3, 10)
+        self.spin_box.setValue(3)
+        self.layout.addWidget(self.spin_box)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        self.layout.addWidget(self.button_box)
+
+    def get_size(self):
+        return self.spin_box.value()
     
-    tk.Button(size_window, text="Começar", command=start_game, font=("Helvetica", 12)).pack(pady=10)
-    size_window.mainloop()
+class MovesDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Escolha o Número de Movimentos Aleatórios")
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
 
+        self.label = QLabel("Escolha o número de movimentos aleatórios:")
+        self.layout.addWidget(self.label)
+
+        self.spin_box = QSpinBox()
+        self.spin_box.setRange(1, 100)
+        self.spin_box.setValue(10)
+        self.layout.addWidget(self.spin_box)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        self.layout.addWidget(self.button_box)
+
+    def get_moves(self):
+        return self.spin_box.value()
+    
 def main():
-    choose_size()
+    app = QApplication(sys.argv)
+
+    size_dialog = SizeDialog()
+    if size_dialog.exec() == QDialog.Accepted:
+        size = size_dialog.get_size()
+        initial_board = generate_random_board(size)
+        puzzle = Puzzle(initial_board)
+        gui = PuzzleGUI(puzzle)
+        gui.show()
+
+        moves_dialog = MovesDialog()
+        if moves_dialog.exec() == QDialog.Accepted:
+            num_moves = moves_dialog.get_moves()
+            gui.random_moves(num_moves)
+
+        sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()
