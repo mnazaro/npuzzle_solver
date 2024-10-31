@@ -114,12 +114,16 @@ class PuzzleGUI(QMainWindow):
         directions = ['up', 'down', 'left', 'right']
         last_moves = []
         for _ in range(num_moves):
-            possible_moves = [d for d in directions if self.puzzle.can_move(d)]
+            possible_moves = [
+                direction for direction in directions
+                if self.puzzle.is_valid_move(direction)
+            ]
             if not possible_moves:
                 continue
             move = random.choice(possible_moves)
             while last_moves and move == last_moves[-1]:
                 move = random.choice(possible_moves)
+            self.animate_slide(*self.puzzle.empty_tile, move)
             self.puzzle.move(move)
             last_moves.append(move)
             if len(last_moves) > 2:

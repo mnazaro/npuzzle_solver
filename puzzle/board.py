@@ -32,3 +32,7 @@ class Puzzle:
             self.empty_tile = (x, y+1)
         else:
             print("Movimento inválido!")
+
+    def is_valid_move(self, direction):
+        x, y = self.empty_tile
+        return (direction == 'up' and x > 0) or (direction == 'down' and x < self.size - 1) or (direction == 'left' and y > 0) or (direction == 'right' and y < self.size - 1)
