@@ -11,11 +11,6 @@ class Puzzle:
                     return (i, j)
         return None
 
-    def display(self):
-        for row in self.board:
-            print(' '.join(str(tile) if tile != 0 else ' ' for tile in row))
-        print()
-
     def move(self, direction):
         x, y = self.empty_tile
         if direction == 'up' and x > 0:
@@ -33,6 +28,17 @@ class Puzzle:
         else:
             print("Movimento inválido!")
 
+
+
     def is_valid_move(self, direction):
         x, y = self.empty_tile
-        return (direction == 'up' and x > 0) or (direction == 'down' and x < self.size - 1) or (direction == 'left' and y > 0) or (direction == 'right' and y < self.size - 1)
+        if direction == 'up' and x > 0:
+            return True
+        elif direction == 'down' and x < self.size - 1:
+            return True
+        elif direction == 'left' and y > 0:
+            return True
+        elif direction == 'right' and y < self.size - 1:
+            return True
+        return False
+            

@@ -14,7 +14,7 @@ class PuzzleGUI(QMainWindow):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle("8 Puzzle Game")
+        self.setWindowTitle("Slide Puzzle Game")
         self.setGeometry(100, 100, 400, 400)
 
         central_widget = QWidget()
@@ -23,7 +23,7 @@ class PuzzleGUI(QMainWindow):
         self.layout = QVBoxLayout()
         central_widget.setLayout(self.layout)
 
-        self.title = QLabel("8 Puzzle Game")
+        self.title = QLabel("Slide Puzzle Game")
         self.title.setAlignment(Qt.AlignCenter)
         self.title.setStyleSheet("font-size: 24px;")
         self.layout.addWidget(self.title)
@@ -59,12 +59,15 @@ class PuzzleGUI(QMainWindow):
         self.update_board()
 
     def update_board(self):
+        goal_board = generate_goal_board(self.puzzle.size)
         for i in range(self.puzzle.size):
             for j in range(self.puzzle.size):
                 tile = self.puzzle.board[i][j]
+                # Define background color based on correct position
+                color = "#90ee90" if tile != 0 and tile == goal_board[i][j] else "#ff817e"
                 self.buttons[i][j].setText(str(tile) if tile != 0 else '')
                 self.buttons[i][j].setStyleSheet(
-                    "font-size: 18px; background-color: #f8f8f8; color: #333;" if tile != 0 else "font-size: 18px; background-color: lightgrey;")
+                    f"font-size: 18px; background-color: {color}; color: #333;" if tile != 0 else "font-size: 18px; background-color: lightgrey;")
 
     def move_tile(self, i, j):
         x, y = self.puzzle.empty_tile
@@ -98,17 +101,35 @@ class PuzzleGUI(QMainWindow):
         animation.start()
 
     def reset_board(self):
-        self.puzzle = Puzzle(generate_random_board(self.puzzle.size))
+        self.moves_dialog = MovesDialog()
+        if self.moves_dialog.exec() == QDialog.Accepted:
+            num_moves = self.moves_dialog.get_moves()
+            self.puzzle = Puzzle(generate_random_board(self.puzzle.size))
+            self.random_moves(num_moves)
         self.update_board()
 
     def solve_puzzle(self):
-        goal_board = generate_goal_board(self.puzzle.size)
-        solution = a_star(self.puzzle, goal_board)
-        if solution:
-            for step in solution:
-                self.puzzle = step
-                self.update_board()
-                QTimer.singleShot(500, lambda: None)  # Delay para visualizar os passos
+        self.solve_dialog = SolveDialog()
+        if self.solve_dialog.exec() == QDialog.Accepted:
+            mode = self.solve_dialog.get_mode()
+            if mode == "random":
+                self.solve_steps = self.random_moves(self.solve_dialog.spin_box.value())
+            elif mode == "heuristic1":
+                self.solve_steps = a_star(self.puzzle, generate_goal_board(self.puzzle.size))
+            elif mode == "heuristic2":
+                self.solve_steps = a_star(self.puzzle, generate_goal_board(self.puzzle.size))
+            elif mode == "custom":
+                self.solve_steps = a_star(self.puzzle, generate_goal_board(self.puzzle.size))
+            self.timer = QTimer()
+            self.timer.timeout.connect(self.step_solution)
+            self.timer.start(500)
+
+    def step_solution(self):
+        try:
+            self.puzzle = next(self.solve_steps)
+            self.update_board()
+        except StopIteration:
+            self.timer.stop()
 
     def random_moves(self, num_moves):
         directions = ['up', 'down', 'left', 'right']
@@ -171,8 +192,8 @@ class MovesDialog(QDialog):
         self.layout.addWidget(self.label)
 
         self.spin_box = QSpinBox()
-        self.spin_box.setRange(1, 100)
-        self.spin_box.setValue(10)
+        self.spin_box.setRange(1, 1000)
+        self.spin_box.setValue(25)
         self.layout.addWidget(self.spin_box)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -182,6 +203,49 @@ class MovesDialog(QDialog):
 
     def get_moves(self):
         return self.spin_box.value()
+    
+class SolveDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Escolha o Método de Resolução")
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+
+        self.label = QLabel("Escolha o método de resolução:")
+        self.layout.addWidget(self.label)
+
+        self.mode_layout = QVBoxLayout()
+        
+        self.random_button = QPushButton("Movimentos Aleatórios")
+        self.random_button.clicked.connect(lambda: self.set_mode("random"))
+        self.mode_layout.addWidget(self.random_button)
+
+        self.heuristic1_button = QPushButton("Heurística 1 - Análise em 1 Nível")
+        self.heuristic1_button.clicked.connect(lambda: self.set_mode("heuristic1"))
+        self.mode_layout.addWidget(self.heuristic1_button)
+
+        self.heuristic2_button = QPushButton("Heurística 2 - Análise em 2 Níveis")
+        self.heuristic2_button.clicked.connect(lambda: self.set_mode("heuristic2"))
+        self.mode_layout.addWidget(self.heuristic2_button)
+
+        self.custom_heuristic_button = QPushButton("Heurística Pessoal")
+        self.custom_heuristic_button.clicked.connect(lambda: self.set_mode("custom"))
+        self.mode_layout.addWidget(self.custom_heuristic_button)
+
+        self.layout.addLayout(self.mode_layout)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        self.layout.addWidget(self.button_box)
+
+        self.selected_mode = None
+
+    def set_mode(self, mode):
+        self.selected_mode = mode
+
+    def get_mode(self):
+        return self.selected_mode   
     
 def main():
     app = QApplication(sys.argv)
