@@ -113,7 +113,7 @@ class PuzzleGUI(QMainWindow):
         if self.solve_dialog.exec() == QDialog.Accepted:
             mode = self.solve_dialog.get_mode()
             if mode == "random":
-                self.solve_steps = self.random_moves(self.solve_dialog.spin_box.value())
+                self.solve_steps = self.random_moves(25)
             elif mode == "heuristic1":
                 self.solve_steps = a_star(self.puzzle, generate_goal_board(self.puzzle.size))
             elif mode == "heuristic2":
