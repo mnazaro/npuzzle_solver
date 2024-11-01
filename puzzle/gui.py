@@ -77,9 +77,6 @@ class PuzzleGUI(QMainWindow):
         self.solve_dialog = SolveDialog()
         if self.solve_dialog.exec() == QDialog.Accepted:
             mode = self.solve_dialog.get_mode()
-            
-            # Retorna o número de movimentos necessários para resolver o tabuleiro
-            # para cada abordagem de resolução e os exibe na interface
 
             if mode == "random":
                 num_moves = random_solver(self.puzzle)
