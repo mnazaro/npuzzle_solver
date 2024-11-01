@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton
 from PySide6.QtWidgets import QVBoxLayout, QWidget, QLabel, QGridLayout
 from PySide6.QtWidgets import QSpinBox, QDialog, QDialogButtonBox
 from PySide6.QtCore import Qt, QTimer, QRect, QPropertyAnimation
-from puzzle.solver import a_star
+from puzzle.solver import random_solver, heuristic_one_solver, heuristic_two_solver, personal_heuristic_solver
 from puzzle.board import Puzzle
 
 class PuzzleGUI(QMainWindow):
@@ -48,13 +48,18 @@ class PuzzleGUI(QMainWindow):
                 row.append(button)
             self.buttons.append(row)
 
-        self.reset_button = QPushButton("Reset")
+        self.reset_button = QPushButton("Reiniciar")
         self.reset_button.clicked.connect(self.reset_board)
         self.layout.addWidget(self.reset_button)
 
-        self.solve_button = QPushButton("Solve")
+        self.solve_button = QPushButton("Resolver")
         self.solve_button.clicked.connect(self.solve_puzzle)
         self.layout.addWidget(self.solve_button)
+
+        self.results_label = QLabel("")
+        self.results_label.setAlignment(Qt.AlignCenter)
+        self.results_label.setStyleSheet("font-size: 14px;")
+        self.layout.addWidget(self.results_label)
 
         self.update_board()
 
@@ -63,75 +68,50 @@ class PuzzleGUI(QMainWindow):
         for i in range(self.puzzle.size):
             for j in range(self.puzzle.size):
                 tile = self.puzzle.board[i][j]
-                # Define background color based on correct position
                 color = "#90ee90" if tile != 0 and tile == goal_board[i][j] else "#ff817e"
                 self.buttons[i][j].setText(str(tile) if tile != 0 else '')
                 self.buttons[i][j].setStyleSheet(
                     f"font-size: 18px; background-color: {color}; color: #333;" if tile != 0 else "font-size: 18px; background-color: lightgrey;")
+    
+    def solve_puzzle(self):
+        self.solve_dialog = SolveDialog()
+        if self.solve_dialog.exec() == QDialog.Accepted:
+            mode = self.solve_dialog.get_mode()
+            
+            # Retorna o número de movimentos necessários para resolver o tabuleiro
+            # para cada abordagem de resolução e os exibe na interface
+
+            if mode == "random":
+                num_moves = random_solver(self.puzzle)
+                self.results_label.setText(f"Resolvido em {num_moves} movimentos.\n Utilizando movimentos aleatórios.")
+            elif mode == "heuristic1":
+                num_moves = heuristic_one_solver(self.puzzle)
+                self.results_label.setText(f"Resolvido em {num_moves} movimentos.\n Utilizando a heurística 1.")
+            elif mode == "heuristic2":
+                num_moves = heuristic_two_solver(self.puzzle)
+                self.results_label.setText(f"Resolvido em {num_moves} movimentos.\n Utilizando a heurística 2.")
+            elif mode == "custom":
+                num_moves = personal_heuristic_solver(self.puzzle)
+                self.results_label.setText(f"Resolvido em {num_moves} movimentos.\n Utilizando a heurística personalizada.")
+            self.update_board()
 
     def move_tile(self, i, j):
         x, y = self.puzzle.empty_tile
         if (i == x and abs(j - y) == 1) or (j == y and abs(i - x) == 1):
             direction = 'up' if i < x else 'down' if i > x else 'left' if j < y else 'right'
-            self.animate_slide(i, j, direction)
             self.puzzle.move(direction)
             self.update_board()
 
-    def animate_slide(self, i, j, direction):
-        x, y = self.puzzle.empty_tile
-        steps = abs(i - x) + abs(j - y)
-        for step in range(steps):
-            QTimer.singleShot(100*step, lambda: self.slide_tile(i, j, direction))
-
-    def slide_tile(self, i, j, direction):
-        button = self.buttons[i][j]
-        animation = QPropertyAnimation(button, b"geometry")
-        animation.setDuration(100)
-        start_rect = button.geometry()
-        if direction == 'up':
-            end_rect = QRect(start_rect.x(), start_rect.y() - button.height(), start_rect.width(), start_rect.height())
-        elif direction == 'down':
-            end_rect = QRect(start_rect.x(), start_rect.y() + button.height(), start_rect.width(), start_rect.height())
-        elif direction == 'left':
-            end_rect = QRect(start_rect.x() - button.width(), start_rect.y(), start_rect.width(), start_rect.height())
-        elif direction == 'right':
-            end_rect = QRect(start_rect.x() + button.width(), start_rect.y(), start_rect.width(), start_rect.height())
-        animation.setStartValue(start_rect)
-        animation.setEndValue(end_rect)
-        animation.start()
-
-    def reset_board(self):
+    def reset_board(self): # Reseta o tabuleiro, misturando as peças
         self.moves_dialog = MovesDialog()
         if self.moves_dialog.exec() == QDialog.Accepted:
             num_moves = self.moves_dialog.get_moves()
-            self.puzzle = Puzzle(generate_random_board(self.puzzle.size))
+            self.puzzle = Puzzle(generate_goal_board(self.puzzle.size))
             self.random_moves(num_moves)
         self.update_board()
 
-    def solve_puzzle(self):
-        self.solve_dialog = SolveDialog()
-        if self.solve_dialog.exec() == QDialog.Accepted:
-            mode = self.solve_dialog.get_mode()
-            if mode == "random":
-                self.solve_steps = self.random_moves(25)
-            elif mode == "heuristic1":
-                self.solve_steps = a_star(self.puzzle, generate_goal_board(self.puzzle.size))
-            elif mode == "heuristic2":
-                self.solve_steps = a_star(self.puzzle, generate_goal_board(self.puzzle.size))
-            elif mode == "custom":
-                self.solve_steps = a_star(self.puzzle, generate_goal_board(self.puzzle.size))
-            self.timer = QTimer()
-            self.timer.timeout.connect(self.step_solution)
-            self.timer.start(500)
 
-    def step_solution(self):
-        try:
-            self.puzzle = next(self.solve_steps)
-            self.update_board()
-        except StopIteration:
-            self.timer.stop()
-
-    def random_moves(self, num_moves):
+    def random_moves(self, num_moves): # Movimento aleatórios para misturar o tabuleiro
         directions = ['up', 'down', 'left', 'right']
         last_moves = []
         for _ in range(num_moves):
@@ -144,19 +124,17 @@ class PuzzleGUI(QMainWindow):
             move = random.choice(possible_moves)
             while last_moves and move == last_moves[-1]:
                 move = random.choice(possible_moves)
-            self.animate_slide(*self.puzzle.empty_tile, move)
             self.puzzle.move(move)
             last_moves.append(move)
             if len(last_moves) > 2:
                 last_moves.pop(0)
             self.update_board()
 
-def generate_random_board(size):
+def generate_goal_board(size):
     board = list(range(1, size*size)) + [0]
     return [board[i*size:(i+1)*size] for i in range(size)]
 
-def generate_goal_board(size):
-    return [list(range(i*size+1, (i+1)*size+1)) for i in range(size)]
+# //MARK:- Dialogs
 
 class SizeDialog(QDialog):
     def __init__(self):
@@ -246,14 +224,16 @@ class SolveDialog(QDialog):
 
     def get_mode(self):
         return self.selected_mode   
-    
+
+# //MARK:- Main
+
 def main():
     app = QApplication(sys.argv)
 
     size_dialog = SizeDialog()
     if size_dialog.exec() == QDialog.Accepted:
         size = size_dialog.get_size()
-        initial_board = generate_random_board(size)
+        initial_board = generate_goal_board(size)
         puzzle = Puzzle(initial_board)
         gui = PuzzleGUI(puzzle)
         gui.show()
